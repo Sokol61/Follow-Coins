@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отслеживание криптовалют</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .green {
+            color: green;
+        }
+        .red {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h2>Выберите криптовалюты для отслеживания:</h2>
+    <table id="cryptoTable">
+        <thead>
+            <tr>
+                <th>Выбрать</th>
+                <th>Криптовалюта</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Сюда будут добавляться строки таблицы динамически -->
+        </tbody>
+    </table>
+    <br>
+    <button id="trackButton" onclick="trackSelected()">Отслеживать</button>
+    <button id="stopButton" onclick="stopTracking()" style="display: none;">Остановить отслеживание</button>
+    <br><br>
+    <h2>Отслеживаемые криптовалюты:</h2>
+    <table id="trackedTable" style="display: none;">
+        <thead>
+            <tr>
+                <th>Криптовалюта</th>
+                <th>Цена</th>
+            </tr>
+        </thead>
+        <tbody id="trackedBody">
+            <!-- Сюда будут добавляться строки таблицы динамически -->
+        </tbody>
+    </table>
+
+    <script>
+        let trackedCoins = [];
+
+        async function populateCryptoTable() {
+            const response = await fetch('https://min-api.cryptocompare.com/data/all/coinlist');
+            const data = await response.json();
+            const coinList = data.Data;
+
+            const cryptoTable = document.getElementById('cryptoTable');
+            const tbody = cryptoTable.querySelector('tbody');
+
+            for (const coin in coinList) {
+                const row = document.createElement('tr');
+                const checkboxCell = document.createElement('td');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = coin;
+                checkboxCell.appendChild(checkbox);
+                row.appendChild(checkboxCell);
+
+                const coinCell = document.createElement('td');
+                coinCell.textContent = coinList[coin].FullName;
+                row.appendChild(coinCell);
+
+                tbody.appendChild(row);
+            }
+        }
+
+        async function trackSelected() {
+            trackedCoins = [];
+            const checkboxes = document.querySelectorAll('#cryptoTable input[type="checkbox"]:checked');
+            for (const checkbox of checkboxes) {
+                trackedCoins.push(checkbox.value);
+            }
+
+            const trackedTableBody = document.getElementById('trackedBody');
+            trackedTableBody.innerHTML = '';
+
+            trackedCoins.forEach(async (coin) => {
+                const response = await fetch(`https://min-api.cryptocompare.com/data/price?fsym=${coin}&tsyms=USD`);
+                const data = await response.json();
+                const price = data.USD;
+
+                const row = document.createElement('tr');
+                const coinCell = document.createElement('td');
+                coinCell.textContent = coin;
+                row.appendChild(coinCell);
+
+                const priceCell = document.createElement('td');
+                priceCell.textContent = `$${price}`;
+                row.appendChild(priceCell);
+
+                trackedTableBody.appendChild(row);
+            });
+
+            // Обновляем цены каждые 10 секунд
+            setInterval(async () => {
+                trackedCoins.forEach(async (coin) => {
+                    const response = await fetch(`https://min-api.cryptocompare.com/data/price?fsym=${coin}&tsyms=USD`);
+                    const data = await response.json();
+                    const price = data.USD;
+
+                    const rows = trackedTableBody.querySelectorAll('tr');
+                    rows.forEach((row) => {
+                        if (row.cells[0].textContent === coin) {
+                            const priceCell = row.cells[1];
+                            const previousPrice = parseFloat(priceCell.dataset.previousPrice);
+                            priceCell.textContent = `$${price}`;
+                            priceCell.dataset.previousPrice = price;
+
+                            // Меняем цвет в зависимости от изменения цены
+                            if (price > previousPrice) {
+                                priceCell.classList.add('green');
+                                priceCell.classList.remove('red');
+                            } else if (price < previousPrice) {
+                                priceCell.classList.add('red');
+                                priceCell.classList.remove('green');
+                            } else {
+                                priceCell.classList.remove('red');
+                                priceCell.classList.remove('green');
+                            }
+                        }
+                    });
+                });
+            }, 10000);
+
+            // Скрываем таблицу с выбором криптовалют
+            const cryptoTable = document.getElementById('cryptoTable');
+            cryptoTable.style.display = 'none';
+
+            // Показываем таблицу с отслеживаемыми криптовалютами
+            const trackedTable = document.getElementById('trackedTable');
+            trackedTable.style.display = 'table';
+
+            // Скрываем кнопку "Отслеживать" и показываем кнопку "Остановить отслеживание"
+            document.getElementById('trackButton').style.display = 'none';
+            document.getElementById('stopButton').style.display = 'inline';
+        }
+
+        function stopTracking() {
+            trackedCoins = [];
+            const trackedTableBody = document.getElementById('trackedBody');
+            trackedTableBody.innerHTML = '';
+
+            // Показываем таблицу с выбором криптовалют
+            const cryptoTable = document.getElementById('cryptoTable');
+            cryptoTable.style.display = 'table';
+
+            // Скрываем таблицу с отслеживаемыми криптовалютами
+            const trackedTable = document.getElementById('trackedTable');
+            trackedTable.style.display = 'none';
+
+            // Скрываем кнопку "Остановить отслеживание" и показываем кнопку "Отслеживать"
+            document.getElementById('trackButton').style.display = 'inline';
+            document.getElementById('stopButton').style.display = 'none';
+        }
+
+        populateCryptoTable();
+    </script>
+</body>
+</html>
